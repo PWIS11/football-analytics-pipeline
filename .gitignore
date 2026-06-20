@@ -1,0 +1,16 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Raw API dumps are reproducible from the API; keep only the small sample.
+data/raw/*.json
+!data/raw/matches_PL_2024.json
+
+# DuckDB build artifact (rebuilt by the pipeline)
+data/processed/*.duckdb
