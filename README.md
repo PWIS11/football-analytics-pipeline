@@ -1,9 +1,9 @@
 # Football Analytics Pipeline
 
-An end-to-end, reproducible data pipeline that ingests match data from a public
-API, models it into a star schema, and serves it to Power BI — built to
-demonstrate analytics-engineering practice (ELT, dimensional modelling, data
-quality, reproducibility).
+An end-to-end, reproducible **ELT** pipeline that ingests match data from a
+public API, lands it in DuckDB, and models it into a tested star schema with
+**dbt** — built to demonstrate analytics-engineering practice (ELT, dimensional
+modelling, data quality testing, documentation, reproducibility).
 
 > Data source: [football-data.org](https://www.football-data.org/) v4 API (free tier).
 
@@ -12,62 +12,82 @@ quality, reproducibility).
 ```mermaid
 flowchart TD
     A["Public API<br/>football-data.org"] --> B["Python: extract<br/>rate-limited client"]
-    B --> C["Python: transform<br/>star schema + quality checks"]
-    C --> D["Load<br/>Parquet + DuckDB"]
-    D --> E["GitHub<br/>repo + CI"]
-    E --> F["Power BI Desktop<br/>model + DAX"]
-    F --> G["Publish to web<br/>public dashboard"]
+    B --> C["Python: load<br/>raw_matches in DuckDB"]
+    C --> D["dbt: staging<br/>clean + type"]
+    D --> E["dbt: marts<br/>star schema + tests + docs"]
+    E --> F["Parquet outputs<br/>(external models)"]
+    F --> G["Power BI<br/>model + DAX"]
+    G --> H["Publish to web<br/>public dashboard"]
 ```
 
-The pipeline is split into three single-responsibility layers — `extract`,
-`transform`, `load` — so each can be tested and reasoned about in isolation.
+The split is deliberate: **Python only Extracts and Loads** the raw data, and
+**dbt does all Transformation in SQL**. That is the ELT pattern — the same shape
+a production analytics-engineering stack uses, scaled down to run free on a
+laptop.
 
 ## Data model
 
-A small star schema: one fact table, three dimensions.
+A star schema plus an aggregate fact, all built and tested by dbt.
 
 ```mermaid
 erDiagram
-    dim_teams ||--o{ fact_matches : "home / away"
-    dim_competitions ||--o{ fact_matches : "competition_code"
-    dim_seasons ||--o{ fact_matches : "season_id"
-    fact_matches {
-        int match_id PK
+    dim_teams ||--o{ fct_matches : "home / away"
+    dim_competitions ||--o{ fct_matches : "competition_code"
+    dim_seasons ||--o{ fct_matches : "season_id"
+    dim_teams ||--o{ fct_team_season_stats : "team_id"
+    fct_matches {
+        bigint match_id PK
         date match_date
-        int home_team_id FK
-        int away_team_id FK
+        bigint home_team_id FK
+        bigint away_team_id FK
         int home_goals
         int away_goals
         int total_goals
         string winner
     }
+    fct_team_season_stats {
+        string competition_code
+        bigint season_id
+        bigint team_id FK
+        int points
+        int goal_difference
+    }
 ```
+
+`fct_team_season_stats` is a league-table style aggregate: points, wins/draws/
+losses and goal difference per team, per competition, per season.
 
 ## Tech stack
 
 | Layer        | Tool                          |
 |--------------|-------------------------------|
-| Ingestion    | Python, `requests`            |
-| Transform    | `pandas`                      |
-| Storage      | Parquet (`pyarrow`), DuckDB   |
-| Testing      | `pytest`                      |
-| Visualisation| Power BI                      |
+| Extract      | Python, `requests`            |
+| Load         | DuckDB (`raw_matches`)        |
+| Transform    | **dbt** (`dbt-duckdb`)        |
+| Testing      | `pytest` (EL) + dbt data tests|
+| Serving      | Parquet -> Power BI           |
 
 ## Project structure
 
 ```
 football-analytics-pipeline/
 ├── config.py              # competitions, seasons, paths, rate limit
-├── pipeline.py            # orchestration: extract -> transform -> load
+├── pipeline.py            # EL: extract -> load raw_matches into DuckDB
 ├── src/
 │   ├── extract.py         # rate-limited API client
-│   ├── transform.py       # build star schema + data-quality checks
-│   └── load.py            # write Parquet / build DuckDB
+│   ├── transform.py       # flatten nested JSON -> flat raw table
+│   └── load.py            # write raw_matches into DuckDB
+├── football_dbt/          # dbt project (the "T")
+│   ├── dbt_project.yml
+│   ├── profiles.yml       # local profile, points at the DuckDB file
+│   └── models/
+│       ├── staging/       # stg_matches (clean + type) + source/tests
+│       └── marts/         # dim_*, fct_matches, fct_team_season_stats + tests
 ├── tests/
 │   └── test_transform.py  # runs offline on sample data
 └── data/
     ├── raw/               # raw API dumps (sample committed)
-    └── processed/         # Parquet + DuckDB outputs
+    └── processed/         # DuckDB + Parquet marts
 ```
 
 ## Quickstart
@@ -83,8 +103,14 @@ pip install -r requirements.txt
 # 3. Add your API token
 cp .env.example .env        # then paste your football-data.org token
 
-# 4. Run the pipeline
-python pipeline.py          # pulls live data and builds the outputs
+# 4. Extract + Load: pull data and land it in DuckDB
+python pipeline.py
+
+# 5. Transform: build and test the models with dbt
+cd football_dbt
+dbt build --profiles-dir .          # staging -> marts + run all tests
+dbt docs generate --profiles-dir .  # build the documentation site
+dbt docs serve --profiles-dir .     # open the docs in your browser (optional)
 ```
 
 No token yet? Rebuild everything from the committed sample with no network:
@@ -92,31 +118,29 @@ No token yet? Rebuild everything from the committed sample with no network:
 ```bash
 python pipeline.py --offline
 pytest -q
+cd football_dbt && dbt build --profiles-dir .
 ```
 
 ## Connecting Power BI
 
-Two zero-cost options:
+The marts are written as Parquet, which Power BI reads natively. Two options:
 
-1. **Local file** — In Power BI Desktop: *Get Data → Parquet* and point at
-   `data/processed/fact_matches.parquet`. Repeat for the dimension tables, then
-   wire the relationships on the `*_id` keys.
-2. **Straight from GitHub** — *Get Data → Web* and paste the raw URL of a
-   committed Parquet file
-   (`https://raw.githubusercontent.com/<user>/<repo>/main/data/processed/fact_matches.parquet`).
-   The report refreshes whenever the pipeline pushes new data.
+1. **Local file** — *Get Data -> Parquet* and point at
+   `data/processed/fct_matches.parquet` (and the other marts), then wire the
+   relationships on the `*_id` keys.
+2. **Straight from GitHub** — *Get Data -> Web* and paste the raw URL of a
+   committed Parquet file.
 
-Once the report is built, *File → Publish to web (public)* gives a shareable
-link for your portfolio. Use it only for this public football data.
+Then *File -> Publish to web (public)* gives a shareable link for your portfolio.
 
 ## Roadmap
 
-- [x] **Iteration 1 (MVP):** API → Python → Parquet/DuckDB → Power BI
-- [ ] **Iteration 2:** replace pandas transforms with a `dbt-duckdb` project
-      (staging → marts layers, `unique` / `not_null` / `relationships` tests,
-      auto-generated docs)
-- [ ] **Iteration 3:** scheduled refresh via GitHub Actions; add more
-      competitions and a multi-season trend view
+- [x] **Iteration 1 (MVP):** API -> Python -> Parquet/DuckDB -> Power BI
+- [x] **Iteration 2:** ELT refactor — Python lands raw data, `dbt-duckdb` owns
+      transformation (staging -> marts), with `unique` / `not_null` /
+      `relationships` / `accepted_values` tests and auto-generated docs
+- [ ] **Iteration 3:** scheduled refresh via GitHub Actions; incremental models;
+      more competitions and a cross-league comparison view
 
 ## License
 

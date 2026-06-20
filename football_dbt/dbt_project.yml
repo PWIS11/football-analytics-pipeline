@@ -1,0 +1,19 @@
+name: football_dbt
+version: "2.0.0"
+config-version: 2
+
+profile: football_dbt
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  football_dbt:
+    staging:
+      +materialized: view
+    marts:
+      # Marts are written out as Parquet so Power BI reads them natively,
+      # while still being defined and tested as dbt models. The output folder
+      # is set via external_root in profiles.yml.
+      +materialized: external

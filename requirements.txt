@@ -1,9 +1,12 @@
-# Runtime
+# Runtime (Extract + Load)
 requests>=2.31
 pandas>=2.1
 pyarrow>=14.0
 duckdb>=0.10
 python-dotenv>=1.0
+
+# Transform (dbt)
+dbt-duckdb>=1.9
 
 # Dev / testing
 pytest>=8.0

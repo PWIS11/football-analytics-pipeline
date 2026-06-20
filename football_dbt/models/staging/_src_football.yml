@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw data landed by the Python EL pipeline."
+    schema: main
+    tables:
+      - name: raw_matches
+        description: "One flat row per match, exactly as flattened from the football-data.org API."

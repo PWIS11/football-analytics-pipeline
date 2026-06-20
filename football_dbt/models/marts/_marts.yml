@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: dim_teams
+    description: "One row per team."
+    columns:
+      - name: team_id
+        description: "Primary key."
+        data_tests: [unique, not_null]
+
+  - name: dim_competitions
+    description: "One row per competition."
+    columns:
+      - name: competition_code
+        description: "Primary key (e.g. PL, PD, BL1)."
+        data_tests: [unique, not_null]
+
+  - name: dim_seasons
+    description: "One row per season."
+    columns:
+      - name: season_id
+        description: "Primary key."
+        data_tests: [unique, not_null]
+
+  - name: fct_matches
+    description: "One row per match, with foreign keys to the dimensions and derived measures."
+    columns:
+      - name: match_id
+        description: "Primary key."
+        data_tests: [unique, not_null]
+      - name: home_team_id
+        description: "FK to dim_teams."
+        data_tests:
+          - relationships:
+              to: ref('dim_teams')
+              field: team_id
+      - name: away_team_id
+        description: "FK to dim_teams."
+        data_tests:
+          - relationships:
+              to: ref('dim_teams')
+              field: team_id
+      - name: competition_code
+        description: "FK to dim_competitions."
+        data_tests:
+          - relationships:
+              to: ref('dim_competitions')
+              field: competition_code
+      - name: season_id
+        description: "FK to dim_seasons."
+        data_tests:
+          - relationships:
+              to: ref('dim_seasons')
+              field: season_id
+
+  - name: fct_team_season_stats
+    description: "League-table style stats per team, competition and season."
+    columns:
+      - name: points
+        description: "Total points (3 win / 1 draw / 0 loss)."
+        data_tests: [not_null]
+      - name: team_id
+        description: "FK to dim_teams."
+        data_tests:
+          - relationships:
+              to: ref('dim_teams')
+              field: team_id

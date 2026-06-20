@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: stg_matches
+    description: "Cleaned, typed match data — one row per match."
+    columns:
+      - name: match_id
+        description: "Unique identifier for the match."
+        data_tests: [unique, not_null]
+      - name: status
+        description: "Match status as reported by the API."
+        data_tests:
+          - accepted_values:
+              values: ["FINISHED", "SCHEDULED", "TIMED", "IN_PLAY", "PAUSED", "POSTPONED", "SUSPENDED", "CANCELLED", "AWARDED"]
+      - name: winner
+        description: "Match outcome for finished games."
+        data_tests:
+          - accepted_values:
+              values: ["HOME_TEAM", "AWAY_TEAM", "DRAW"]
+              config:
+                where: "winner is not null"

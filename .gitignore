@@ -8,9 +8,17 @@ __pycache__/
 venv/
 .pytest_cache/
 
-# Raw API dumps are reproducible from the API; keep only the small sample.
+# Raw API dumps are reproducible from the API; don't commit them.
+# (The test fixture lives separately in tests/fixtures/ and is always tracked.)
 data/raw/*.json
-!data/raw/matches_PL_2024.json
 
 # DuckDB build artifact (rebuilt by the pipeline)
 data/processed/*.duckdb
+
+# dbt build artifacts
+football_dbt/target/
+football_dbt/dbt_packages/
+football_dbt/logs/
+
+# dbt local user telemetry id (machine-specific, not project-relevant)
+football_dbt/.user.yml

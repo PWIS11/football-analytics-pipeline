@@ -1,0 +1,11 @@
+# Local profile so anyone cloning the repo can run dbt with no global setup:
+#   cd football_dbt && dbt build --profiles-dir .
+football_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "../data/processed/football.duckdb"
+      threads: 4
+      # External (Parquet) models are written here, named <model>.parquet
+      external_root: "../data/processed"
