@@ -8,5 +8,8 @@ python-dotenv>=1.0
 # Transform (dbt)
 dbt-duckdb>=1.9
 
+# Visualisation
+matplotlib>=3.8
+
 # Dev / testing
 pytest>=8.0

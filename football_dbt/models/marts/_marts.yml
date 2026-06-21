@@ -65,3 +65,31 @@ models:
           - relationships:
               to: ref('dim_teams')
               field: team_id
+
+  - name: fct_standings_by_matchday
+    description: "Cumulative league standings after each matchday. One row per team per matchday per competition/season. Powers the Season Race bump chart and the animated README chart."
+    columns:
+      - name: cumulative_points
+        description: "Points accumulated through this matchday."
+        data_tests: [not_null]
+      - name: position
+        description: "League position after this matchday (rank by points, then GD, then GF)."
+        data_tests: [not_null]
+      - name: team_id
+        description: "FK to dim_teams."
+        data_tests:
+          - relationships:
+              to: ref('dim_teams')
+              field: team_id
+      - name: competition_code
+        description: "FK to dim_competitions."
+        data_tests:
+          - relationships:
+              to: ref('dim_competitions')
+              field: competition_code
+      - name: season_id
+        description: "FK to dim_seasons."
+        data_tests:
+          - relationships:
+              to: ref('dim_seasons')
+              field: season_id
